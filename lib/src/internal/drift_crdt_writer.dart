@@ -7,6 +7,13 @@ class DriftCrdtWriter {
   final Hlc _hlc;
   final Set<String> _affectedTables = {};
 
+  /// Fills `entity` with the fields needed to update the crdt columns and calls
+  /// `database.into(table).insert(entity)`.
+  ///
+  /// Returns the `rowid` of the inserted row.
+  ///
+  /// See also:
+  /// * [InsertStatement.insert] for more details about the `rowid` returned.
   Future<int> insert<TableDsl extends CrdtColumns, D>(
     TableInfo<TableDsl, D> table,
     Insertable<D> entity,
@@ -32,6 +39,15 @@ class DriftCrdtWriter {
     return res;
   }
 
+  /// Fills `entity` with the fields needed to update the crdt columns and calls
+  /// `database.into(table).insert(entity, onConflict: DoUpdate((_) => entity))`
+  /// while making sure to ignore the update if the there is already a more
+  /// recent row in the database.
+  ///
+  /// Returns the `rowid` of the inserted row.
+  ///
+  /// See also:
+  /// * [InsertStatement.insert] for more details about the `rowid` returned.
   Future<int> insertOnConflictUpdate<TableDsl extends CrdtColumns, D>(
     TableInfo<TableDsl, D> table,
     Insertable<D> entity,
@@ -62,6 +78,14 @@ class DriftCrdtWriter {
     return res;
   }
 
+  /// Fills `entity` with the fields needed to update the crdt columns and calls
+  /// `database.update(table)..where(...).write(entity)`.
+  ///
+  /// Returns the amount of rows that have been affected by this operation.
+  ///
+  /// See also:
+  /// * [UpdateStatement.write] for more details about the number of rows
+  /// updated.
   Future<int> update<TableDsl extends CrdtColumns, D>(
     TableInfo<TableDsl, D> table,
     Insertable<D> entity, {
@@ -97,6 +121,17 @@ class DriftCrdtWriter {
     return res;
   }
 
+  /// Fills `entity` with the fields needed to update the crdt columns and calls
+  /// `database.update(table)..where(...).write(entity)`.
+  ///
+  /// The `entity` is filled with the fields needed to update the crdt columns
+  /// and the `is_deleted` column is set to `true`.
+  ///
+  /// Returns the amount of rows that have been affected by this operation.
+  ///
+  /// See also:
+  /// * [UpdateStatement.write] for more details about the number of rows
+  /// updated.
   Future<int> delete<TableDsl extends CrdtColumns, D>(
     TableInfo<TableDsl, D> table, {
     WhereClauses<TableDsl>? where,
