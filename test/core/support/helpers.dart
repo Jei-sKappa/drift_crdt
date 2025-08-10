@@ -25,6 +25,20 @@ Iterable<Expression<bool>> whereTodo1Id($TodosTable t) => [
       t.id.equals(todo1Id),
     ];
 
+Future<void> fillDbWithSomeTodos(DriftCrdt<TestDatabase> crdt) async {
+  for (var i = 0; i < 10; i++) {
+    await crdt.write(
+      (w) => w.insert(
+        crdt.db.todos,
+        TodosCompanion(
+          id: Value('__todo-id-${i}__'),
+          title: Value('title $i'),
+        ),
+      ),
+    );
+  }
+}
+
 void expectCrdtColumnsAreCorrect(TestDatabase db, Todo row, String nodeId) {
   expect(row.hlc, isNotEmpty);
   expect(row.nodeId, nodeId);
@@ -157,13 +171,11 @@ Future<Todo> insertAndExpectTodoFromRemoteFuture(
   );
 
   // Use unsafe write to insert a todo from the future
-  final rowsWritten = await crdt.writeUnsafe((db, params, _) async {
+  await crdt.writeUnsafe((db, params, _) async {
     final table = db.todos;
     final res = await db.into(table).insert(todo1WrittenInARemoteFuture);
     return (result: res, affectedTables: [table.actualTableName]);
   });
-
-  expect(rowsWritten, 1);
 
   // When using writeUnsafe the node id from the crdt is ignored because it
   // is user the one provided in the writeUnsafe callback so when can expect

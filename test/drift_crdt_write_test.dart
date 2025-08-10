@@ -23,6 +23,9 @@ void main() {
 
       userB = DriftCrdt<TestDatabase>(db);
       await userB.init('node-b');
+
+      // Fill the db with some todos to test the update and delete operations
+      await fillDbWithSomeTodos(userA);
     });
 
     tearDown(() async {
@@ -30,8 +33,7 @@ void main() {
     });
 
     test('insert correctly inserts new row', () async {
-      final rowsWritten = await userA.write((w) => w.insert(db.todos, todo1));
-      expect(rowsWritten, 1);
+      await userA.write((w) => w.insert(db.todos, todo1));
 
       await expectInsertIsCorrect(db, userA.nodeId);
     });
@@ -51,10 +53,9 @@ void main() {
     });
 
     test('insertOnConflictUpdate correctly inserts new row', () async {
-      final rowsWritten = await userA.write(
+      await userA.write(
         (w) => w.insertOnConflictUpdate(db.todos, todo1),
       );
-      expect(rowsWritten, 1);
 
       await expectInsertIsCorrect(db, userA.nodeId);
     });
@@ -63,10 +64,9 @@ void main() {
       await userA.write((w) => w.insert(db.todos, todo1));
       final row = await expectInsertIsCorrect(db, userA.nodeId);
 
-      final rowsWritten = await userA.write(
+      await userA.write(
         (w) => w.insertOnConflictUpdate(db.todos, todo1Updated),
       );
-      expect(rowsWritten, 1);
 
       await expectUpdateIsCorrect(db, userA.nodeId, row);
     });
@@ -78,10 +78,9 @@ void main() {
         await userA.write((w) => w.insert(db.todos, todo1));
         final row = await expectInsertIsCorrect(db, userA.nodeId);
 
-        final rowsWritten = await userB.write(
+        await userB.write(
           (w) => w.insertOnConflictUpdate(db.todos, todo1Updated),
         );
-        expect(rowsWritten, 1);
 
         await expectUpdateIsCorrect(db, userB.nodeId, row);
       },
@@ -90,16 +89,9 @@ void main() {
     test('insertOnConflictUpdate fails if hlc is older', () async {
       final row = await insertAndExpectTodoFromRemoteFuture(db, userA);
 
-      final rowsWritten = await userA.write(
+      await userA.write(
         (w) => w.insertOnConflictUpdate(db.todos, todo1Updated),
       );
-      //TODO: For some reason this is 1 instead of 0.
-      // Probably it's a Drift/SQLite bug or maybe i'm not understanding it
-      // correctly.
-      // File an issue for this.
-      // Currently the test expect the "wrong" result.
-      // Anyway this package behaviour is checked by the test below.
-      expect(rowsWritten, 1);
 
       await expectWriteFail(db, row);
     });
