@@ -12,11 +12,10 @@ part 'utils/where_clauses.dart';
 
 typedef CrdtParams = ({String hlc, String nodeId, String modified});
 
-typedef CrdtFilters =
-    ({
-      Expression<bool> Function(CrdtColumns t) hlcFilter,
-      String Function(String tableName) customHlcFilter,
-    });
+typedef CrdtFilters = ({
+  Expression<bool> Function(CrdtColumns t) hlcFilter,
+  String Function(String tableName) customHlcFilter,
+});
 
 class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
   DriftCrdt(this.db);
@@ -70,12 +69,9 @@ class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
 
     final tables = db.allTables.toList();
 
-    final selected =
-        onlyTables == null
-            ? tables
-            : tables
-                .where((t) => onlyTables.contains(t.actualTableName))
-                .toList();
+    final selected = onlyTables == null
+        ? tables
+        : tables.where((t) => onlyTables.contains(t.actualTableName)).toList();
 
     final result = <String, List<Map<String, Object?>>>{};
 
@@ -108,7 +104,13 @@ class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
       for (final row in rows) {
         final map = <String, Object?>{};
         for (final col in allColumns) {
-          map[col.$name] = row.read(col);
+          final value = row.read(col);
+          // Convert HLC string back to Hlc object for CRDT compatibility
+          if (col.$name == 'hlc' && value is String) {
+            map[col.$name] = value.toHlc;
+          } else {
+            map[col.$name] = value;
+          }
         }
         tableChanges.add(map);
       }
@@ -137,35 +139,45 @@ class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
         }
 
         for (final record in entry.value) {
-          final recordHlcStr =
-              (record['hlc'] is Hlc)
-                  ? (record['hlc']! as Hlc).toString()
-                  : record['hlc']! as String;
-          final recordNodeId =
-              (record['hlc'] is Hlc)
-                  ? (record['hlc']! as Hlc).nodeId
-                  : recordHlcStr.toHlc.nodeId;
+          final recordHlcStr = (record['hlc'] is Hlc)
+              ? (record['hlc']! as Hlc).toString()
+              : record['hlc']! as String;
+          final recordNodeId = (record['hlc'] is Hlc)
+              ? (record['hlc']! as Hlc).nodeId
+              : recordHlcStr.toHlc.nodeId;
 
-          // Stamp CRDT fields; modified is set to hlcNew
-          final rawInsertable = _rawInsertable<dynamic>((nullToAbsent) {
-            // Start with an empty map
-            final map = <String, Expression<Object>>{};
-
-            record.forEach((key, value) {
-              // Skip null values if nullToAbsent is true
-              if (nullToAbsent && value == null) return;
-
-              map[key] = Variable<Object>(value);
-            });
-
-            map['hlc'] = Variable<String>(recordHlcStr);
-            map['node_id'] = Variable<String>(recordNodeId);
-            map['modified'] = Variable<String>(hlcNew.toString());
-
-            return map;
+          // Use raw SQL to avoid type issues with dynamic tables
+          final columnsAndValues = <String, Object?>{};
+          record.forEach((key, value) {
+            if (value != null) {
+              columnsAndValues[key] = value;
+            }
           });
 
-          await _rawInsertOnConflictUpdate(db, table, rawInsertable, hlcNew);
+          // Override CRDT fields
+          columnsAndValues['hlc'] = recordHlcStr;
+          columnsAndValues['node_id'] = recordNodeId;
+          columnsAndValues['modified'] = hlcNew.toString();
+
+          // Build column and value lists for SQL
+          final columns = columnsAndValues.keys.toList();
+          final values = columnsAndValues.values.toList();
+          final placeholders =
+              List.generate(values.length, (i) => '?${i + 1}').join(', ');
+          final columnList = columns.join(', ');
+
+          // Build update clause for conflict resolution
+          final updateClauses = columns
+              .where((col) => col != 'id') // Don't update primary key
+              .map((col) => '$col = excluded.$col')
+              .join(', ');
+
+          await db.customStatement('''
+            INSERT INTO ${table.actualTableName} ($columnList)
+            VALUES ($placeholders)
+            ON CONFLICT DO UPDATE SET $updateClauses
+            WHERE excluded.hlc > ${table.actualTableName}.hlc
+          ''', values);
         }
       }
     });
@@ -190,8 +202,7 @@ class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
       T db,
       CrdtParams params,
       CrdtFilters filters,
-    )
-    action,
+    ) action,
   ) async {
     final hlc = canonicalTime.increment();
     final hlcStr = hlc.toString();

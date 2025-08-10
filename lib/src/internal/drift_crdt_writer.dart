@@ -66,12 +66,13 @@ class DriftCrdtWriter {
       return map;
     });
 
-    final res = await _rawInsertOnConflictUpdate(
-      _db,
-      table,
-      rawInsertable,
-      _hlc,
-    );
+    final res = await _db.into(table).insert(
+          rawInsertable,
+          onConflict: DoUpdate(
+            (_) => rawInsertable,
+            where: (t) => t.hlc.isSmallerThanValue(hlcStr),
+          ),
+        );
 
     _affectedTables.add(table.actualTableName);
 
