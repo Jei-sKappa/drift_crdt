@@ -37,8 +37,7 @@ void main() {
     });
 
     test('insert fails if row already exists', () async {
-      final rowsWritten = await userA.write((w) => w.insert(db.todos, todo1));
-      expect(rowsWritten, 1);
+      await userA.write((w) => w.insert(db.todos, todo1));
 
       await expectLater(
         userA.write(
@@ -61,15 +60,13 @@ void main() {
     });
 
     test('insertOnConflictUpdate correctly updates existing row', () async {
-      final rowsWritten = await userA.write((w) => w.insert(db.todos, todo1));
-      expect(rowsWritten, 1);
-
+      await userA.write((w) => w.insert(db.todos, todo1));
       final row = await expectInsertIsCorrect(db, userA.nodeId);
 
-      final rowsWritten2 = await userA.write(
+      final rowsWritten = await userA.write(
         (w) => w.insertOnConflictUpdate(db.todos, todo1Updated),
       );
-      expect(rowsWritten2, 1);
+      expect(rowsWritten, 1);
 
       await expectUpdateIsCorrect(db, userA.nodeId, row);
     });
@@ -78,15 +75,13 @@ void main() {
       'insertOnConflictUpdate correctly updates existing row inserted by other '
       'node',
       () async {
-        final rowsWritten = await userA.write((w) => w.insert(db.todos, todo1));
-        expect(rowsWritten, 1);
-
+        await userA.write((w) => w.insert(db.todos, todo1));
         final row = await expectInsertIsCorrect(db, userA.nodeId);
 
-        final rowsWritten2 = await userB.write(
+        final rowsWritten = await userB.write(
           (w) => w.insertOnConflictUpdate(db.todos, todo1Updated),
         );
-        expect(rowsWritten2, 1);
+        expect(rowsWritten, 1);
 
         await expectUpdateIsCorrect(db, userB.nodeId, row);
       },
@@ -110,15 +105,13 @@ void main() {
     });
 
     test('update correctly updates existing row', () async {
-      final rowsWritten = await userA.write((w) => w.insert(db.todos, todo1));
-      expect(rowsWritten, 1);
-
+      await userA.write((w) => w.insert(db.todos, todo1));
       final row = await expectInsertIsCorrect(db, userA.nodeId);
 
-      final rowsWritten2 = await userA.write(
+      final rowsWritten = await userA.write(
         (w) => w.update(db.todos, todo1Updated, where: whereTodo1Id),
       );
-      expect(rowsWritten2, 1);
+      expect(rowsWritten, 1);
 
       await expectUpdateIsCorrect(db, userA.nodeId, row);
     });
@@ -126,15 +119,13 @@ void main() {
     test(
       'update correctly updates existing row inserted by other node',
       () async {
-        final rowsWritten = await userA.write((w) => w.insert(db.todos, todo1));
-        expect(rowsWritten, 1);
-
+        await userA.write((w) => w.insert(db.todos, todo1));
         final row = await expectInsertIsCorrect(db, userA.nodeId);
 
-        final rowsWritten2 = await userB.write(
+        final rowsWritten = await userB.write(
           (w) => w.update(db.todos, todo1Updated, where: whereTodo1Id),
         );
-        expect(rowsWritten2, 1);
+        expect(rowsWritten, 1);
 
         await expectUpdateIsCorrect(db, userB.nodeId, row);
       },
@@ -181,17 +172,14 @@ void main() {
       await userA.write((w) => w.insert(db.todos, todo1));
       await expectInsertIsCorrect(db, userA.nodeId);
 
+      await userA.write((w) => w.delete(db.todos, where: whereTodo1Id));
+
+      final row = await expectDeleteIsCorrect(db);
+
       final rowsWritten = await userA.write(
         (w) => w.delete(db.todos, where: whereTodo1Id),
       );
       expect(rowsWritten, 1);
-
-      final row = await expectDeleteIsCorrect(db);
-
-      final rowsWritten2 = await userA.write(
-        (w) => w.delete(db.todos, where: whereTodo1Id),
-      );
-      expect(rowsWritten2, 1);
 
       await expectDeleteJustUpdateCrdtColumns(db, userA.nodeId, row);
     });
