@@ -8,16 +8,22 @@ class UnsafeSqliteCrdtTodoRepository extends SqliteCrdtTodoRepository {
 
   @override
   Future<void> add(String title) async {
-    await crdt.writeUnsafe((db, params, _) async {
+    await crdt.writeUnsafe((db, params, filters) async {
       final table = db.todos;
+
+      final todoWithParams = TodosCompanion(
+        id: Value(uuid.v4()),
+        title: Value(title),
+      ).withParams(params);
 
       final res = await db
           .into(table)
-          .insertOnConflictUpdate(
-            TodosCompanion(
-              id: Value(uuid.v4()),
-              title: Value(title),
-            ).withParams(params),
+          .insert(
+            todoWithParams,
+            onConflict: DoUpdate(
+              (_) => todoWithParams,
+              where: filters.hlcFilter,
+            ),
           );
 
       return (result: res, affectedTables: [table.actualTableName]);
