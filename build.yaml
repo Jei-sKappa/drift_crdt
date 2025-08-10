@@ -1,0 +1,8 @@
+targets:
+  $default:
+    builders:
+      drift_dev:
+        generate_for:
+          - lib/**.dart
+          - test/**.dart
+
