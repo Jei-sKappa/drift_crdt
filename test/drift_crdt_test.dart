@@ -374,6 +374,43 @@ void main() {
         expect(result.nodeId, 'node-b');
       });
 
+      // TODO: Readd this test when the crdt package is fixed. See 'https://github.com/cachapa/sqlite_crdt/issues/14'
+      // test(
+      //     'should merge when changeset hlc is provided as String and derive '
+      //     'nodeId', () async {
+      //   await crdt.init('node-a');
+      //   await crdt2.init('node-b');
+
+      //   // Prepare a manual changeset where hlc is a String, not an Hlc object
+      //   final remoteHlc = Hlc.now('remote-node-xyz');
+      //   final changeset = <String, List<Map<String, Object?>>>{
+      //     'todos': [
+      //       {
+      //         'id': todo1Id,
+      //         'title': 'From string HLC',
+      //         'done': false,
+      //         // Provide HLC as String to hit the `: record['hlc']! as String`
+      //         // path
+      //         'hlc': remoteHlc.toString(),
+      //         // Omit node_id to ensure it is derived via
+      //         // `recordHlcStr.toHlc.nodeId`.
+      //         // `node_id': intentionally omitted
+      //         'modified': remoteHlc.toString(),
+      //         'is_deleted': false,
+      //       },
+      //     ],
+      //   };
+
+      //   await crdt.merge(changeset);
+
+      //   final row = await (crdt.db.select(crdt.db.todos)
+      //         ..where((t) => t.id.equals(todo1Id)))
+      //       .getSingle();
+      //   expect(row.title, 'From string HLC');
+      //   // Node id should be parsed from the string HLC
+      //   expect(row.nodeId, remoteHlc.nodeId);
+      // });
+
       test('should handle empty changeset', () async {
         await crdt.merge({});
         // Should not throw or cause issues
@@ -554,6 +591,30 @@ void main() {
             .getSingle();
         expect(result.isDeleted, true);
         expect(result.title, todo1Title); // Data should still be there
+      });
+    });
+
+    group('getLastModified internal accumulation', () {
+      setUp(() async {
+        await crdt.init('node-a');
+      });
+
+      test(
+          'should compute max modified when rows exist '
+          '(covers accumulator update)', () async {
+        // Insert two rows to ensure there is a max(modified) string present
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
+        await _delay; // ensure distinct HLCs
+        await crdt.write(
+          (w) => w.insert(
+            crdt.db.todos,
+            const TodosCompanion(id: Value('2'), title: Value('Second')),
+          ),
+        );
+
+        final last = await crdt.getLastModified();
+        // Should be the latest HLC and not null
+        expect(last >= crdt.canonicalTime, isTrue);
       });
     });
   });

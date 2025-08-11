@@ -1,3 +1,4 @@
+import 'package:crdt/crdt.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:drift_crdt/drift_crdt.dart';
@@ -65,6 +66,35 @@ void main() {
                 ),
               );
           return (result: res, affectedTables: [table.actualTableName]);
+        });
+
+    Future<int> unsafeRawUpsertWithCustomWhere(
+      DriftCrdt<TestDatabase> crdt,
+      Map<String, Object?> values,
+    ) =>
+        crdt.writeUnsafe((db, params, filters) async {
+          final table = db.todos;
+
+          // Build raw INSERT ... ON CONFLICT DO UPDATE using customHlcFilter
+          final keys = values.keys.toList();
+          final vals = values.values.toList();
+          final placeholders =
+              List.generate(vals.length, (i) => '?${i + 1}').join(', ');
+          final columns = keys.join(', ');
+          final updateClauses = keys
+              .where((k) => k != 'id')
+              .map((k) => '$k = excluded.$k')
+              .join(', ');
+
+          final sql = '''
+INSERT INTO ${table.actualTableName} ($columns)
+VALUES ($placeholders)
+ON CONFLICT DO UPDATE SET $updateClauses ${filters.customHlcFilter(table.actualTableName)}
+''';
+
+          await db.customStatement(sql, vals);
+          // customStatement returns void; return a dummy result for the API
+          return (result: 0, affectedTables: [table.actualTableName]);
         });
 
     Future<int> unsafeUpdateTodo(
@@ -235,6 +265,36 @@ void main() {
       expect(rowsWritten, 0);
 
       await expectWriteFail(userA.db, row);
+    });
+
+    test('customHlcFilter is used for raw upsert conflict clause', () async {
+      // Seed a record
+      await unsafeInsertTodo(userA, todo1);
+      final existing = await expectInsertIsCorrect(userA.db, userA.nodeId);
+
+      // Attempt to upsert with an older HLC using raw SQL path that relies on
+      // customHlcFilter
+      // First, create values map with older hlc than current canonical
+      final older = Hlc(DateTime(1970), 0, 'old-node');
+      final values = <String, Object?>{
+        'id': existing.id,
+        'title': 'older-title-ignored',
+        'done': 1,
+        'hlc': older.toString(),
+        'node_id': older.nodeId,
+        'modified': older.toString(),
+        'is_deleted': 0,
+      };
+
+      await unsafeRawUpsertWithCustomWhere(userA, values);
+
+      // Row should remain unchanged due to WHERE excluded.hlc > table.hlc
+      final after = await (userA.db.select(userA.db.todos)
+            ..where((t) => t.id.equals(existing.id)))
+          .getSingle();
+      expect(after.title, existing.title);
+      expect(after.done, existing.done);
+      expect(after.nodeId, existing.nodeId);
     });
   });
 }
