@@ -7,21 +7,25 @@ import 'core/support/support.dart';
 
 void main() {
   group('DriftCrdt.write', () {
-    late TestDatabase db;
     late DriftCrdt<TestDatabase> userA;
     late DriftCrdt<TestDatabase> userB;
 
     setUp(() async {
-      db = TestDatabase(
+      driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+      userA = DriftCrdt<TestDatabase>(TestDatabase(
         DatabaseConnection(
           NativeDatabase.memory(),
           closeStreamsSynchronously: true,
         ),
-      );
-      userA = DriftCrdt<TestDatabase>(db);
+      ));
       await userA.init('node-a');
 
-      userB = DriftCrdt<TestDatabase>(db);
+      userB = DriftCrdt<TestDatabase>(TestDatabase(
+        DatabaseConnection(
+          NativeDatabase.memory(),
+          closeStreamsSynchronously: true,
+        ),
+      ));
       await userB.init('node-b');
 
       // Fill the db with some todos to test the update and delete operations
@@ -29,22 +33,23 @@ void main() {
     });
 
     tearDown(() async {
-      await db.close();
+      await userA.db.close();
+      await userB.db.close();
     });
 
     test('insert correctly inserts new row', () async {
-      await userA.write((w) => w.insert(db.todos, todo1));
+      await userA.write((w) => w.insert(userA.db.todos, todo1));
 
-      await expectInsertIsCorrect(db, userA.nodeId);
+      await expectInsertIsCorrect(userA.db, userA.nodeId);
     });
 
     test('insert fails if row already exists', () async {
-      await userA.write((w) => w.insert(db.todos, todo1));
+      await userA.write((w) => w.insert(userA.db.todos, todo1));
 
       await expectLater(
         userA.write(
           (w) => w.insert(
-            db.todos,
+            userA.db.todos,
             todo1.copyWith(title: const Value('something')),
           ),
         ),
@@ -54,137 +59,141 @@ void main() {
 
     test('insertOnConflictUpdate correctly inserts new row', () async {
       await userA.write(
-        (w) => w.insertOnConflictUpdate(db.todos, todo1),
+        (w) => w.insertOnConflictUpdate(userA.db.todos, todo1),
       );
 
-      await expectInsertIsCorrect(db, userA.nodeId);
+      await expectInsertIsCorrect(userA.db, userA.nodeId);
     });
 
     test('insertOnConflictUpdate correctly updates existing row', () async {
-      await userA.write((w) => w.insert(db.todos, todo1));
-      final row = await expectInsertIsCorrect(db, userA.nodeId);
+      await userA.write((w) => w.insert(userA.db.todos, todo1));
+      final row = await expectInsertIsCorrect(userA.db, userA.nodeId);
 
       await userA.write(
-        (w) => w.insertOnConflictUpdate(db.todos, todo1Updated),
+        (w) => w.insertOnConflictUpdate(userA.db.todos, todo1Updated),
       );
 
-      await expectUpdateIsCorrect(db, userA.nodeId, row);
+      await expectUpdateIsCorrect(userA.db, userA.nodeId, row);
     });
 
     test(
       'insertOnConflictUpdate correctly updates existing row inserted by other '
       'node',
       () async {
-        await userA.write((w) => w.insert(db.todos, todo1));
-        final row = await expectInsertIsCorrect(db, userA.nodeId);
+        await userA.write((w) => w.insert(userA.db.todos, todo1));
+        final row = await expectInsertIsCorrect(userA.db, userA.nodeId);
+
+        await userB.merge(await userA.getChangeset());
 
         await userB.write(
-          (w) => w.insertOnConflictUpdate(db.todos, todo1Updated),
+          (w) => w.insertOnConflictUpdate(userB.db.todos, todo1Updated),
         );
 
-        await expectUpdateIsCorrect(db, userB.nodeId, row);
+        await expectUpdateIsCorrect(userB.db, userB.nodeId, row);
       },
     );
 
     test('insertOnConflictUpdate fails if hlc is older', () async {
-      final row = await insertAndExpectTodoFromRemoteFuture(db, userA);
+      final row = await insertAndExpectTodoFromRemoteFuture(userA.db, userA);
 
       await userA.write(
-        (w) => w.insertOnConflictUpdate(db.todos, todo1Updated),
+        (w) => w.insertOnConflictUpdate(userA.db.todos, todo1Updated),
       );
 
-      await expectWriteFail(db, row);
+      await expectWriteFail(userA.db, row);
     });
 
     test('update correctly updates existing row', () async {
-      await userA.write((w) => w.insert(db.todos, todo1));
-      final row = await expectInsertIsCorrect(db, userA.nodeId);
+      await userA.write((w) => w.insert(userA.db.todos, todo1));
+      final row = await expectInsertIsCorrect(userA.db, userA.nodeId);
 
       final rowsWritten = await userA.write(
-        (w) => w.update(db.todos, todo1Updated, where: whereTodo1Id),
+        (w) => w.update(userA.db.todos, todo1Updated, where: whereTodo1Id),
       );
       expect(rowsWritten, 1);
 
-      await expectUpdateIsCorrect(db, userA.nodeId, row);
+      await expectUpdateIsCorrect(userA.db, userA.nodeId, row);
     });
 
     test(
       'update correctly updates existing row inserted by other node',
       () async {
-        await userA.write((w) => w.insert(db.todos, todo1));
-        final row = await expectInsertIsCorrect(db, userA.nodeId);
+        await userA.write((w) => w.insert(userA.db.todos, todo1));
+        final row = await expectInsertIsCorrect(userA.db, userA.nodeId);
+
+        await userB.merge(await userA.getChangeset());
 
         final rowsWritten = await userB.write(
-          (w) => w.update(db.todos, todo1Updated, where: whereTodo1Id),
+          (w) => w.update(userB.db.todos, todo1Updated, where: whereTodo1Id),
         );
         expect(rowsWritten, 1);
 
-        await expectUpdateIsCorrect(db, userB.nodeId, row);
+        await expectUpdateIsCorrect(userB.db, userB.nodeId, row);
       },
     );
 
     test('update fails if row does not exist', () async {
       final rowsWritten = await userA.write(
-        (w) => w.update(db.todos, todo1Updated, where: whereTodo1Id),
+        (w) => w.update(userA.db.todos, todo1Updated, where: whereTodo1Id),
       );
       expect(rowsWritten, 0);
     });
 
     test('update fails if hlc is older', () async {
-      final row = await insertAndExpectTodoFromRemoteFuture(db, userA);
+      final row = await insertAndExpectTodoFromRemoteFuture(userA.db, userA);
 
       final rowsWritten = await userA.write(
-        (w) => w.update(db.todos, todo1Updated, where: whereTodo1Id),
+        (w) => w.update(userA.db.todos, todo1Updated, where: whereTodo1Id),
       );
       expect(rowsWritten, 0);
 
-      await expectWriteFail(db, row);
+      await expectWriteFail(userA.db, row);
     });
 
     test('delete marks row as deleted', () async {
-      await userA.write((w) => w.insert(db.todos, todo1));
-      await expectInsertIsCorrect(db, userA.nodeId);
+      await userA.write((w) => w.insert(userA.db.todos, todo1));
+      await expectInsertIsCorrect(userA.db, userA.nodeId);
 
       final rowsWritten = await userA.write(
-        (w) => w.delete(db.todos, where: whereTodo1Id),
+        (w) => w.delete(userA.db.todos, where: whereTodo1Id),
       );
       expect(rowsWritten, 1);
 
-      await expectDeleteIsCorrect(db);
+      await expectDeleteIsCorrect(userA.db);
     });
 
     test('delete fails if row does not exist', () async {
       final rowsWritten = await userA.write(
-        (w) => w.delete(db.todos, where: whereTodo1Id),
+        (w) => w.delete(userA.db.todos, where: whereTodo1Id),
       );
       expect(rowsWritten, 0);
     });
 
     test('delete update crdt columns if row is already deleted', () async {
-      await userA.write((w) => w.insert(db.todos, todo1));
-      await expectInsertIsCorrect(db, userA.nodeId);
+      await userA.write((w) => w.insert(userA.db.todos, todo1));
+      await expectInsertIsCorrect(userA.db, userA.nodeId);
 
-      await userA.write((w) => w.delete(db.todos, where: whereTodo1Id));
+      await userA.write((w) => w.delete(userA.db.todos, where: whereTodo1Id));
 
-      final row = await expectDeleteIsCorrect(db);
+      final row = await expectDeleteIsCorrect(userA.db);
 
       final rowsWritten = await userA.write(
-        (w) => w.delete(db.todos, where: whereTodo1Id),
+        (w) => w.delete(userA.db.todos, where: whereTodo1Id),
       );
       expect(rowsWritten, 1);
 
-      await expectDeleteJustUpdateCrdtColumns(db, userA.nodeId, row);
+      await expectDeleteJustUpdateCrdtColumns(userA.db, userA.nodeId, row);
     });
 
     test('delete fails if hlc is older', () async {
-      final row = await insertAndExpectTodoFromRemoteFuture(db, userA);
+      final row = await insertAndExpectTodoFromRemoteFuture(userA.db, userA);
 
       final rowsWritten = await userA.write(
-        (w) => w.delete(db.todos, where: whereTodo1Id),
+        (w) => w.delete(userA.db.todos, where: whereTodo1Id),
       );
       expect(rowsWritten, 0);
 
-      await expectWriteFail(db, row);
+      await expectWriteFail(userA.db, row);
     });
   });
 }

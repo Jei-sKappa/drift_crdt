@@ -12,23 +12,28 @@ Future<void> get _delay => Future.delayed(const Duration(milliseconds: 1));
 
 void main() {
   group('DriftCrdt', () {
-    late TestDatabase db;
     late DriftCrdt<TestDatabase> crdt;
     late DriftCrdt<TestDatabase> crdt2;
 
     setUp(() async {
-      db = TestDatabase(
+      driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+      crdt = DriftCrdt(TestDatabase(
         DatabaseConnection(
           NativeDatabase.memory(),
           closeStreamsSynchronously: true,
         ),
-      );
-      crdt = DriftCrdt<TestDatabase>(db);
-      crdt2 = DriftCrdt<TestDatabase>(db);
+      ));
+      crdt2 = DriftCrdt(TestDatabase(
+        DatabaseConnection(
+          NativeDatabase.memory(),
+          closeStreamsSynchronously: true,
+        ),
+      ));
     });
 
     tearDown(() async {
-      await db.close();
+      await crdt.db.close();
+      await crdt2.db.close();
     });
 
     group('isInitialized', () {
@@ -69,10 +74,15 @@ void main() {
       test('should use last modified time from database if exists', () async {
         // First initialize and add some data
         await crdt.init('node-1');
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
 
         // Create new crdt instance and init - should use last modified from database
-        final crdt3 = DriftCrdt<TestDatabase>(db);
+        final crdt3 = DriftCrdt(TestDatabase(
+          DatabaseConnection(
+            NativeDatabase.memory(),
+            closeStreamsSynchronously: true,
+          ),
+        ));
         await crdt3.init('node-2');
 
         // Should adopt the time from existing data (preserving original node ID)
@@ -95,17 +105,17 @@ void main() {
       });
 
       test('should return last modified time after insert', () async {
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
         final lastModified = await crdt.getLastModified();
         expect(lastModified.nodeId, crdt.nodeId);
         expect(lastModified.dateTime, crdt.canonicalTime.dateTime);
       });
 
       test('should filter by onlyNodeId', () async {
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
         await _delay;
         await crdt2.write((w) => w.insert(
-            db.todos,
+            crdt2.db.todos,
             const TodosCompanion(
               id: Value('2'),
               title: Value('Second todo'),
@@ -124,10 +134,10 @@ void main() {
       });
 
       test('should filter by exceptNodeId', () async {
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
         await _delay;
         await crdt2.write((w) => w.insert(
-            db.todos,
+            crdt2.db.todos,
             const TodosCompanion(
               id: Value('2'),
               title: Value('Second todo'),
@@ -167,9 +177,9 @@ void main() {
       });
 
       test('should return changeset with all data', () async {
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
         await crdt.write((w) => w.insert(
-            db.todos,
+            crdt.db.todos,
             const TodosCompanion(
               id: Value('2'),
               title: Value('Second todo'),
@@ -183,7 +193,7 @@ void main() {
       });
 
       test('should filter by onlyTables', () async {
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
 
         final changeset = await crdt.getChangeset(onlyTables: ['todos']);
         expect(changeset.keys, contains('todos'));
@@ -194,9 +204,9 @@ void main() {
       });
 
       test('should filter by onlyNodeId', () async {
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
         await crdt2.write((w) => w.insert(
-            db.todos,
+            crdt2.db.todos,
             const TodosCompanion(
               id: Value('2'),
               title: Value('Second todo'),
@@ -212,9 +222,9 @@ void main() {
       });
 
       test('should filter by exceptNodeId', () async {
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
         await crdt2.write((w) => w.insert(
-            db.todos,
+            crdt2.db.todos,
             const TodosCompanion(
               id: Value('2'),
               title: Value('Second todo'),
@@ -232,12 +242,12 @@ void main() {
       });
 
       test('should filter by modifiedOn', () async {
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
         final firstHlc = crdt.canonicalTime;
 
         await _delay;
         await crdt.write((w) => w.insert(
-            db.todos,
+            crdt.db.todos,
             const TodosCompanion(
               id: Value('2'),
               title: Value('Second todo'),
@@ -249,12 +259,12 @@ void main() {
       });
 
       test('should filter by modifiedAfter', () async {
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
         final firstHlc = crdt.canonicalTime;
 
         await _delay;
         await crdt.write((w) => w.insert(
-            db.todos,
+            crdt.db.todos,
             const TodosCompanion(
               id: Value('2'),
               title: Value('Second todo'),
@@ -267,7 +277,7 @@ void main() {
 
       test('should return empty changeset when modifiedAfter is latest',
           () async {
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
         final latestHlc = crdt.canonicalTime;
 
         final changeset = await crdt.getChangeset(modifiedAfter: latestHlc);
@@ -292,10 +302,10 @@ void main() {
       });
 
       test('should combine filters correctly', () async {
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
         await _delay;
         await crdt2.write((w) => w.insert(
-            db.todos,
+            crdt2.db.todos,
             const TodosCompanion(
               id: Value('2'),
               title: Value('Second todo'),
@@ -319,12 +329,12 @@ void main() {
       });
 
       test('should merge into empty database', () async {
-        await crdt2.write((w) => w.insert(db.todos, todo1));
+        await crdt2.write((w) => w.insert(crdt2.db.todos, todo1));
         final changeset = await crdt2.getChangeset();
 
         await crdt.merge(changeset);
 
-        final result = await (db.select(db.todos)
+        final result = await (crdt.db.select(crdt.db.todos)
               ..where((t) => t.id.equals(todo1Id)))
             .getSingle();
         expect(result.title, todo1Title);
@@ -337,7 +347,7 @@ void main() {
       });
 
       test('should update canonical time after merge', () async {
-        await crdt2.write((w) => w.insert(db.todos, todo1));
+        await crdt2.write((w) => w.insert(crdt2.db.todos, todo1));
         final changeset = await crdt2.getChangeset();
         final originalCanonicalTime = crdt.canonicalTime;
 
@@ -348,16 +358,16 @@ void main() {
       });
 
       test('should merge newer record over older', () async {
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
         await _delay;
 
-        await crdt2
-            .write((w) => w.insertOnConflictUpdate(db.todos, todo1Updated));
+        await crdt2.write(
+            (w) => w.insertOnConflictUpdate(crdt2.db.todos, todo1Updated));
         final changeset = await crdt2.getChangeset();
 
         await crdt.merge(changeset);
 
-        final result = await (db.select(db.todos)
+        final result = await (crdt.db.select(crdt.db.todos)
               ..where((t) => t.id.equals(todo1Id)))
             .getSingle();
         expect(result.title, todo1UpdatedTitle);
@@ -366,16 +376,16 @@ void main() {
       });
 
       test('should not merge older record over newer', () async {
-        await crdt2.write((w) => w.insert(db.todos, todo1));
+        await crdt2.write((w) => w.insert(crdt2.db.todos, todo1));
         await _delay;
 
-        await crdt
-            .write((w) => w.insertOnConflictUpdate(db.todos, todo1Updated));
+        await crdt.write(
+            (w) => w.insertOnConflictUpdate(crdt.db.todos, todo1Updated));
 
         final changeset = await crdt2.getChangeset();
         await crdt.merge(changeset);
 
-        final result = await (db.select(db.todos)
+        final result = await (crdt.db.select(crdt.db.todos)
               ..where((t) => t.id.equals(todo1Id)))
             .getSingle();
         expect(result.title, todo1UpdatedTitle); // Should keep newer data
@@ -388,12 +398,22 @@ void main() {
         const nodeIdLower = 'node-aaaa';
         const nodeIdHigher = 'node-zzzz';
 
-        final crdtLower = DriftCrdt<TestDatabase>(db);
-        final crdtHigher = DriftCrdt<TestDatabase>(db);
+        final crdtLower = DriftCrdt<TestDatabase>(TestDatabase(
+          DatabaseConnection(
+            NativeDatabase.memory(),
+            closeStreamsSynchronously: true,
+          ),
+        ));
+        final crdtHigher = DriftCrdt<TestDatabase>(TestDatabase(
+          DatabaseConnection(
+            NativeDatabase.memory(),
+            closeStreamsSynchronously: true,
+          ),
+        ));
         await crdtLower.init(nodeIdLower);
         await crdtHigher.init(nodeIdHigher);
 
-        await crdtLower.write((w) => w.insert(db.todos, todo1));
+        await crdtLower.write((w) => w.insert(crdtLower.db.todos, todo1));
         final changeset = await crdtLower.getChangeset();
 
         // Manually modify the changeset to have same HLC but different node ID and value
@@ -405,7 +425,7 @@ void main() {
 
         await crdtLower.merge(changeset);
 
-        final result = await (db.select(db.todos)
+        final result = await (crdtLower.db.select(crdtLower.db.todos)
               ..where((t) => t.id.equals(todo1Id)))
             .getSingle();
         expect(result.title, 'Higher node id title');
@@ -415,9 +435,9 @@ void main() {
       test('should merge multiple tables', () async {
         // This test would require another table, but we only have todos table
         // So we'll test with multiple records in todos table
-        await crdt2.write((w) => w.insert(db.todos, todo1));
+        await crdt2.write((w) => w.insert(crdt2.db.todos, todo1));
         await crdt2.write((w) => w.insert(
-            db.todos,
+            crdt2.db.todos,
             const TodosCompanion(
               id: Value('2'),
               title: Value('Second todo'),
@@ -426,7 +446,7 @@ void main() {
         final changeset = await crdt2.getChangeset();
         await crdt.merge(changeset);
 
-        final results = await db.select(db.todos).get();
+        final results = await crdt.db.select(crdt.db.todos).get();
         expect(results.length, 2);
         expect(results.map((r) => r.id), contains(todo1Id));
         expect(results.map((r) => r.id), contains('2'));
@@ -436,7 +456,7 @@ void main() {
         // Generate many records
         for (var i = 0; i < 100; i++) {
           await crdt2.write((w) => w.insert(
-              db.todos,
+              crdt2.db.todos,
               TodosCompanion(
                 id: Value('todo-$i'),
                 title: Value('Todo $i'),
@@ -446,17 +466,17 @@ void main() {
         final changeset = await crdt2.getChangeset();
         await crdt.merge(changeset);
 
-        final results = await db.select(db.todos).get();
+        final results = await crdt.db.select(crdt.db.todos).get();
         expect(results.length, 100);
       });
 
       test('should preserve CRDT semantics during merge', () async {
         // Insert, update, then merge - should maintain proper HLC ordering
-        await crdt.write((w) => w.insert(db.todos, todo1));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
         final firstHlc = crdt.canonicalTime;
 
         await crdt2.write((w) => w.insert(
-            db.todos,
+            crdt2.db.todos,
             const TodosCompanion(
               id: Value('2'),
               title: Value('Remote todo'),
@@ -465,7 +485,7 @@ void main() {
 
         await crdt.merge(changeset);
 
-        final results = await db.select(db.todos).get();
+        final results = await crdt.db.select(crdt.db.todos).get();
         final localTodo = results.firstWhere((r) => r.id == todo1Id);
         final remoteTodo = results.firstWhere((r) => r.id == '2');
 
@@ -474,23 +494,28 @@ void main() {
       });
 
       test('should handle deleted records in changeset', () async {
-        await crdt.write((w) => w.insert(db.todos, todo1));
-        await crdt.write((w) => w.delete(db.todos, where: whereTodo1Id));
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
+        await crdt.write((w) => w.delete(crdt.db.todos, where: whereTodo1Id));
 
         final changeset = await crdt.getChangeset();
 
         // Create new crdt instance and merge the deleted record
-        final crdt3 = DriftCrdt<TestDatabase>(db);
+        final crdt3 = DriftCrdt<TestDatabase>(TestDatabase(
+          DatabaseConnection(
+            NativeDatabase.memory(),
+            closeStreamsSynchronously: true,
+          ),
+        ));
         await crdt3.init('node-c');
 
         // Clear the database first
-        await db.transaction(() async {
-          await db.delete(db.todos).go();
+        await crdt3.db.transaction(() async {
+          await crdt3.db.delete(crdt3.db.todos).go();
         });
 
         await crdt3.merge(changeset);
 
-        final result = await (db.select(db.todos)
+        final result = await (crdt3.db.select(crdt3.db.todos)
               ..where((t) => t.id.equals(todo1Id)))
             .getSingle();
         expect(result.isDeleted, true);
