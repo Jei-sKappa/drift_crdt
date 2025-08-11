@@ -1,7 +1,7 @@
 part of '../drift_crdt.dart';
 
-typedef WhereClauses<TableDsl extends CrdtColumns> =
-    Iterable<Expression<bool>> Function(TableDsl);
+typedef WhereClauses<TableDsl extends CrdtColumns> = Iterable<Expression<bool>>
+    Function(TableDsl);
 
 Expression<bool> _combineWhereClauses<TableDsl extends CrdtColumns>(
   TableDsl table,

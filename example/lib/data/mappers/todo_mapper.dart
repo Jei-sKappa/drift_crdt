@@ -15,10 +15,6 @@ extension TodoMapperExtension on Todo {
 
 extension TodoEntityMapperExtension on TodoModel {
   Todo toEntity() {
-    return Todo(
-      id: id,
-      title: title,
-      done: done,
-    );
+    return Todo(id: id, title: title, done: done);
   }
 }

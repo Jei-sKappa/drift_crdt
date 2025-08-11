@@ -449,7 +449,8 @@ void main() {
         await crdtLower.write((w) => w.insert(crdtLower.db.todos, todo1));
         final changeset = await crdtLower.getChangeset();
 
-        // Manually modify the changeset to have same HLC but different node ID and value
+        // Manually modify the changeset to have same HLC but different node ID
+        // and value
         changeset['todos']!.first['hlc'] =
             (changeset['todos']!.first['hlc']! as Hlc)
                 .apply(nodeId: nodeIdHigher);
