@@ -12,8 +12,7 @@ Expression<bool> _combineWhereClauses<TableDsl extends CrdtColumns>(
   final predicates = where(table);
   Expression<bool>? combined;
   for (final p in predicates) {
-    combined =
-        combined == null ? p : (combined & p); // or use .and if you prefer
+    combined = combined == null ? p : (combined & p);
   }
 
   return combined ?? const Constant(true);
