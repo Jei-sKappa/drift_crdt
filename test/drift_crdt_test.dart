@@ -124,6 +124,27 @@ void main() {
         expect(lastModified.dateTime, crdt.canonicalTime.dateTime);
       });
 
+      test(
+          'should return last modified time after insert when there are '
+          'multiple tables', () async {
+        await fillDbWithSomeUsers(crdt);
+        await fillDbWithSomeTodos(crdt);
+
+        // Insert two rows to ensure there is a max(modified) string present
+        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
+        await _delay; // ensure distinct HLCs
+        await crdt.write(
+          (w) => w.insert(
+            crdt.db.todos,
+            const TodosCompanion(id: Value('2'), title: Value('Second')),
+          ),
+        );
+
+        final lastModified = await crdt.getLastModified();
+        expect(lastModified.nodeId, crdt.nodeId);
+        expect(lastModified.dateTime, crdt.canonicalTime.dateTime);
+      });
+
       test('should filter by onlyNodeId', () async {
         await crdt.write((w) => w.insert(crdt.db.todos, todo1));
         await _delay;
@@ -591,30 +612,6 @@ void main() {
             .getSingle();
         expect(result.isDeleted, true);
         expect(result.title, todo1Title); // Data should still be there
-      });
-    });
-
-    group('getLastModified internal accumulation', () {
-      setUp(() async {
-        await crdt.init('node-a');
-      });
-
-      test(
-          'should compute max modified when rows exist '
-          '(covers accumulator update)', () async {
-        // Insert two rows to ensure there is a max(modified) string present
-        await crdt.write((w) => w.insert(crdt.db.todos, todo1));
-        await _delay; // ensure distinct HLCs
-        await crdt.write(
-          (w) => w.insert(
-            crdt.db.todos,
-            const TodosCompanion(id: Value('2'), title: Value('Second')),
-          ),
-        );
-
-        final last = await crdt.getLastModified();
-        // Should be the latest HLC and not null
-        expect(last >= crdt.canonicalTime, isTrue);
       });
     });
   });

@@ -25,6 +25,20 @@ Iterable<Expression<bool>> whereTodo1Id($TodosTable t) => [
       t.id.equals(todo1Id),
     ];
 
+Future<void> fillDbWithSomeUsers(DriftCrdt<TestDatabase> crdt) async {
+  for (var i = 0; i < 10; i++) {
+    await crdt.write(
+      (w) => w.insert(
+        crdt.db.users,
+        UsersCompanion(
+          id: Value('__user-id-${i}__'),
+          name: Value('user $i'),
+        ),
+      ),
+    );
+  }
+}
+
 Future<void> fillDbWithSomeTodos(DriftCrdt<TestDatabase> crdt) async {
   for (var i = 0; i < 10; i++) {
     await crdt.write(
