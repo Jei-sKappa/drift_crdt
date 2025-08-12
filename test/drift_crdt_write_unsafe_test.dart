@@ -128,7 +128,8 @@ ON CONFLICT DO UPDATE SET $updateClauses WHERE ${filters.customHlcFilter(table.a
             ..where(filters.hlcFilter);
 
           final res = await q.write(
-              const TodosCompanion(isDeleted: Value(true)).withParams(params));
+            const TodosCompanion().withParams(params, delete: true),
+          );
 
           return (result: res, affectedTables: [table.actualTableName]);
         });

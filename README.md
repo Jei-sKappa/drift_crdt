@@ -285,6 +285,22 @@ await crdt.writeUnsafe((db, params, filters) async {
 });
 ```
 
+#### Tip
+
+You can use the `withParams` extension method with the `delete` parameter set to `true` to automatically set the `isDeleted` column to `true`.
+
+```dart
+await crdt.writeUnsafe((db, params, filters) async {
+  final query = db.update(db.todos)..where(filters.hlcFilter);
+
+  await query.write(
+    const TodosCompanion().withParams(params, delete: true),
+  );
+
+  return (result: null, affectedTables: [db.todos.actualTableName]);
+});
+```
+
 ## Sync between nodes
 
 Export a changeset from one node and merge it into another. The package uses HLCs to ensure deterministic conflict resolution.
