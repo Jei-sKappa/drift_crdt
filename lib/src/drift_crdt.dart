@@ -10,22 +10,45 @@ part 'drift_crdt_reader.dart';
 part 'utils/with_params_on_insertable_crdt_columns.dart';
 part 'utils/where_clauses.dart';
 
+/// Tuple of CRDT metadata fields required on each write.
+///
+/// - **hlc**: Hybrid Logical Clock timestamp for the write (as ISO string)
+/// - **nodeId**: Node identifier embedded in the HLC
+/// - **modified**: The effective modification timestamp (HLC string)
 typedef CrdtParams = ({String hlc, String nodeId, String modified});
 
+/// Filters used when performing unsafe writes to enforce CRDT ordering.
+///
+/// - **hlcFilter**: Expression enforcing that the incoming HLC is newer than
+///   the stored one for a given table.
+/// - **customHlcFilter**: Raw SQL fragment producer for ON CONFLICT clauses.
 typedef CrdtFilters = ({
   Expression<bool> Function(CrdtColumns t) hlcFilter,
   String Function(String tableName) customHlcFilter,
 });
 
+/// CRDT-capable wrapper around a Drift [`GeneratedDatabase`].
+///
+/// This class coordinates HLC time, produces change sets, merges remote data
+/// using last-writer-wins semantics, and provides helpers for safe and unsafe
+/// write operations.
 class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
+  /// Creates a new CRDT helper bound to the provided Drift database.
   DriftCrdt(this.db);
 
   @override
   final T db;
 
   bool _isInitialized = false;
+
+  /// Whether [`init`] has been called to seed the canonical HLC time.
   bool get isInitialized => _isInitialized;
 
+  /// Initializes the CRDT state by seeding `canonicalTime`.
+  ///
+  /// If the database contains rows, the latest `modified` HLC is used.
+  /// Otherwise a zero HLC is created using the provided [nodeId] or a
+  /// generated one.
   Future<void> init([String? nodeId]) async {
     if (_isInitialized) return;
 
@@ -35,6 +58,12 @@ class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
     _isInitialized = true;
   }
 
+  /// Returns the maximum `modified` HLC across CRDT-enabled tables.
+  ///
+  /// Optionally restricts the search to rows written by [onlyNodeId] or to all
+  /// rows except those written by [exceptNodeId].
+  ///
+  /// Both [onlyNodeId] and [exceptNodeId] cannot be used together.
   @override
   Future<Hlc> getLastModified({
     String? onlyNodeId,
@@ -47,6 +76,8 @@ class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
     return last ?? Hlc.zero(canonicalTime.nodeId);
   }
 
+  /// Builds a changeset with all rows from CRDT-enabled tables, optionally
+  /// filtered by table names, node id, or modification time windows.
   @override
   Future<CrdtChangeset> getChangeset({
     Iterable<String>? onlyTables,
@@ -122,6 +153,8 @@ class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
     return result;
   }
 
+  /// Merges a [changeset] into the local database using last-writer-wins
+  /// based on the `hlc` column. Notifies listeners via [`onDatasetChanged`].
   @override
   Future<void> merge(CrdtChangeset changeset) async {
     if (changeset.recordCount == 0) return;
@@ -185,6 +218,19 @@ class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
     onDatasetChanged(changeset.keys, hlcNew);
   }
 
+  /// Runs a sequence of CRDT-safe write operations in a transaction.
+  ///
+  /// The provided [action] receives a [`DriftCrdtWriter`] that automatically
+  /// stamps rows with CRDT fields and enforces HLC ordering.
+  ///
+  /// If you think that the helper methods provided by this api are not enough
+  /// for your use case, consider
+  /// [filing an issue](https://github.com/Jei-sKappa/drift_crdt/issues/new)
+  /// to discuss it.
+  ///
+  /// See also:
+  /// * [DriftCrdt.writeUnsafe] for a more flexible alternative that allows
+  ///   even custom SQL statements.
   Future<R> write<R>(Future<R> Function(DriftCrdtWriter s) action) async {
     late final R result;
     await db.transaction(() async {
@@ -197,6 +243,21 @@ class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
     return result;
   }
 
+  /// Helper function to handle raw database operations.
+  ///
+  /// This is useful when higher control is required or when you need to execute
+  /// raw SQL.
+  ///
+  /// If possible always prefer the [write] method, as it is safer and easier
+  /// to use.
+  ///
+  /// If you are forced to use this method consider
+  /// [filing an issue](https://github.com/Jei-sKappa/drift_crdt/issues/new)
+  /// to discuss your use case.
+  ///
+  /// See also:
+  /// * [DriftCrdt.write] for a safer alternative that automatically handles
+  ///   CRDT columns and ordering.
   Future<R> writeUnsafe<R>(
     Future<({R result, Set<TableInfo<dynamic, dynamic>>? affectedTables})>
         Function(

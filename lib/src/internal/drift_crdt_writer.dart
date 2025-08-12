@@ -1,5 +1,8 @@
 part of '../drift_crdt.dart';
 
+/// Helper used inside [`DriftCrdt.write`] transactions to perform CRDT-safe
+/// inserts, updates, and logical deletes while stamping rows with the proper
+/// HLC fields and enforcing last-writer-wins.
 class DriftCrdtWriter {
   DriftCrdtWriter._(this._db, this._hlc);
 
@@ -7,7 +10,7 @@ class DriftCrdtWriter {
   final Hlc _hlc;
   final Set<String> _affectedTables = {};
 
-  /// Fills `entity` with the fields needed to update the crdt columns and calls
+  /// Fills `entity` with the fields needed to update the CRDT columns and calls
   /// `database.into(table).insert(entity)`.
   ///
   /// Returns the `rowid` of the inserted row.
@@ -39,7 +42,7 @@ class DriftCrdtWriter {
     return res;
   }
 
-  /// Fills `entity` with the fields needed to update the crdt columns and calls
+  /// Fills `entity` with the fields needed to update the CRDT columns and calls
   /// `database.into(table).insert(entity, onConflict: DoUpdate((_) => entity))`
   /// while making sure to ignore the update if the there is already a more
   /// recent row in the database.
@@ -79,7 +82,7 @@ class DriftCrdtWriter {
     return res;
   }
 
-  /// Fills `entity` with the fields needed to update the crdt columns and calls
+  /// Fills `entity` with the fields needed to update the CRDT columns and calls
   /// `database.update(table)..where(...).write(entity)`.
   ///
   /// Returns the amount of rows that have been affected by this operation.
@@ -122,7 +125,7 @@ class DriftCrdtWriter {
     return res;
   }
 
-  /// Fills `entity` with the fields needed to update the crdt columns and calls
+  /// Fills `entity` with the fields needed to update the CRDT columns and calls
   /// `database.update(table)..where(...).write(entity)`.
   ///
   /// The `entity` is filled with the fields needed to update the crdt columns

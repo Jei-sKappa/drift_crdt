@@ -2,8 +2,6 @@ include: package:very_good_analysis/analysis_options.yaml
 
 linter:
   rules:
-    # Temporarily disable this rule until the app reaches a more stable state
-    public_member_api_docs: false
     # I prefer to specify the arguments explicitly to be clear
     avoid_redundant_argument_values: false
     # I'm the only one working on this project, so I don't need to worry about this
