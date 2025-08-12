@@ -14,13 +14,56 @@ on:
       - 'test/**'
       - '.github/workflows/dart_package.yml'
 
+  workflow_call:
+    secrets:
+      CODECOV_TOKEN:
+        required: true
+
 jobs:
   build:
-    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/dart_package.yml@v1
-    with:
-      analyze_directories: 'lib test'
-      concurrency: 1
-      coverage_excludes: '**/lib/src/crdt_columns.dart'
-      format_directories: 'lib test'
-      min_coverage: 95
-      no_example: true
+    defaults:
+      run:
+        working-directory: "."
+
+    runs-on: "ubuntu-latest"
+
+    steps:
+      - name: 📚 Git Checkout
+        uses: actions/checkout@v5
+
+      - name: 🎯 Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: 📦 Install Dependencies
+        run: dart pub get --no-example
+
+      - name: ✨ Check Formatting
+        run: dart format --line-length 80 --set-exit-if-changed lib test
+
+      - name: 🕵️ Analyze
+        run: dart analyze --fatal-infos --fatal-warnings lib test
+
+      - name: 🧪 Run Tests
+        run: |
+          dart pub global activate coverage 1.2.0
+          dart test -j 1 --coverage=coverage --platform=vm && dart pub global run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info --packages=.dart_tool/package_config.json --report-on="lib"
+
+      - name: 📊 Check Code Coverage
+        uses: VeryGoodOpenSource/very_good_coverage@v3
+        with:
+          path: coverage/lcov.info
+          exclude: '**/lib/src/crdt_columns.dart'
+          min_coverage: 95
+
+      - name: 📤 Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          directory: .
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ${{ github.repository }}
+          flags: unittests
+          name: drift_crdt-coverage
+          verbose: false
+          fail_ci_if_error: true
