@@ -89,7 +89,7 @@ void main() {
           final sql = '''
 INSERT INTO ${table.actualTableName} ($columns)
 VALUES ($placeholders)
-ON CONFLICT DO UPDATE SET $updateClauses ${filters.customHlcFilter(table.actualTableName)}
+ON CONFLICT DO UPDATE SET $updateClauses WHERE ${filters.customHlcFilter(table.actualTableName)}
 ''';
 
           await db.customStatement(sql, vals);

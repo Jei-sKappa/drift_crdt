@@ -212,7 +212,7 @@ class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
       (hlc: hlcStr, nodeId: hlc.nodeId, modified: hlcStr),
       (
         hlcFilter: (t) => t.hlc.isSmallerThanValue(hlcStr),
-        customHlcFilter: (table) => 'WHERE excluded.hlc > $table.hlc',
+        customHlcFilter: (table) => 'excluded.hlc > $table.hlc',
       ),
     );
 
