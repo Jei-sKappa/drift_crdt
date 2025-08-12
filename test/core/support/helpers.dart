@@ -188,7 +188,7 @@ Future<Todo> insertAndExpectTodoFromRemoteFuture(
   await crdt.writeUnsafe((db, params, _) async {
     final table = db.todos;
     final res = await db.into(table).insert(todo1WrittenInARemoteFuture);
-    return (result: res, affectedTables: [table.actualTableName]);
+    return (result: res, affectedTables: {table});
   });
 
   // When using writeUnsafe the node id from the crdt is ignored because it

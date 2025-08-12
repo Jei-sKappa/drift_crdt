@@ -46,7 +46,7 @@ void main() {
           final table = db.todos;
 
           final res = await db.into(table).insert(todo.withParams(params));
-          return (result: res, affectedTables: [table.actualTableName]);
+          return (result: res, affectedTables: {table});
         });
 
     Future<int> unsafeInsertOnConflictUpdateTodo(
@@ -65,7 +65,7 @@ void main() {
                   where: filters.hlcFilter,
                 ),
               );
-          return (result: res, affectedTables: [table.actualTableName]);
+          return (result: res, affectedTables: {table});
         });
 
     Future<int> unsafeRawUpsertWithCustomWhere(
@@ -94,7 +94,7 @@ ON CONFLICT DO UPDATE SET $updateClauses WHERE ${filters.customHlcFilter(table.a
 
           await db.customStatement(sql, vals);
           // customStatement returns void; return a dummy result for the API
-          return (result: 0, affectedTables: [table.actualTableName]);
+          return (result: 0, affectedTables: {table});
         });
 
     Future<int> unsafeUpdateTodo(
@@ -113,7 +113,7 @@ ON CONFLICT DO UPDATE SET $updateClauses WHERE ${filters.customHlcFilter(table.a
 
           final res = await q.write(todoWithParams);
 
-          return (result: res, affectedTables: [table.actualTableName]);
+          return (result: res, affectedTables: {table});
         });
 
     Future<int> unsafeDeleteTodo(
@@ -131,7 +131,7 @@ ON CONFLICT DO UPDATE SET $updateClauses WHERE ${filters.customHlcFilter(table.a
             const TodosCompanion().withParams(params, delete: true),
           );
 
-          return (result: res, affectedTables: [table.actualTableName]);
+          return (result: res, affectedTables: {table});
         });
 
     test('insert correctly inserts new row', () async {

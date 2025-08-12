@@ -198,7 +198,7 @@ await crdt.writeUnsafe((db, params, filters) async {
     ),
   );
 
-  return (result: null, affectedTables: [db.todos.actualTableName]);
+  return (result: null, affectedTables: {db.todos});
 });
 ```
 
@@ -214,7 +214,7 @@ await crdt.writeUnsafe((db, params, filters) async {
     const TodosCompanion(isDeleted: Value(true)).withParams(params),
   );
 
-  return (result: null, affectedTables: [db.todos.actualTableName]);
+  return (result: null, affectedTables: {db.todos});
 });
 ```
 
@@ -252,7 +252,7 @@ WHERE ${filters.customHlcFilter(db.todos.actualTableName)}
     updateKind: UpdateKind.update,
   );
 
-  return (result: null, affectedTables: [db.todos.actualTableName]);
+  return (result: null, affectedTables: {db.todos});
 });
 ```
 
@@ -268,7 +268,7 @@ await crdt.writeUnsafe((db, params, filters) async {
 
   await query.go();
 
-  return (result: null, affectedTables: [db.todos.actualTableName]);
+  return (result: null, affectedTables: {db.todos});
 });
 ```
 
@@ -281,7 +281,7 @@ await crdt.writeUnsafe((db, params, filters) async {
     const TodosCompanion(isDeleted: Value(true)).withParams(params),
   );
 
-  return (result: null, affectedTables: [db.todos.actualTableName]);
+  return (result: null, affectedTables: {db.todos});
 });
 ```
 
@@ -297,7 +297,7 @@ await crdt.writeUnsafe((db, params, filters) async {
     const TodosCompanion().withParams(params, delete: true),
   );
 
-  return (result: null, affectedTables: [db.todos.actualTableName]);
+  return (result: null, affectedTables: {db.todos});
 });
 ```
 

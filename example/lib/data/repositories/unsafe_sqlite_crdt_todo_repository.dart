@@ -26,7 +26,7 @@ class UnsafeSqliteCrdtTodoRepository extends SqliteCrdtTodoRepository {
             ),
           );
 
-      return (result: res, affectedTables: [table.actualTableName]);
+      return (result: res, affectedTables: {table});
     });
   }
 
@@ -51,7 +51,7 @@ class UnsafeSqliteCrdtTodoRepository extends SqliteCrdtTodoRepository {
           TodosCompanion(done: Value(!row.done)).withParams(params),
         );
 
-        return (result: res, affectedTables: [table.actualTableName]);
+        return (result: res, affectedTables: {table});
       });
     });
   }
@@ -70,7 +70,7 @@ class UnsafeSqliteCrdtTodoRepository extends SqliteCrdtTodoRepository {
         const TodosCompanion(isDeleted: Value(true)).withParams(params),
       );
 
-      return (result: res, affectedTables: [table.actualTableName]);
+      return (result: res, affectedTables: {table});
     });
   }
 }

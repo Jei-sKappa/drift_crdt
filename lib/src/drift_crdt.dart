@@ -198,7 +198,8 @@ class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
   }
 
   Future<R> writeUnsafe<R>(
-    Future<({R result, Iterable<String>? affectedTables})> Function(
+    Future<({R result, Set<TableInfo<dynamic, dynamic>>? affectedTables})>
+        Function(
       T db,
       CrdtParams params,
       CrdtFilters filters,
@@ -217,7 +218,7 @@ class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
     );
 
     if (affectedTables?.isNotEmpty ?? false) {
-      onDatasetChanged(affectedTables!, hlc);
+      onDatasetChanged(affectedTables!.map((t) => t.actualTableName), hlc);
     }
 
     return result;
