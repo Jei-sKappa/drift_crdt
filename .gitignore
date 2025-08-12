@@ -32,3 +32,6 @@ build/
 
 # Do not track coverage folder in version control
 coverage/
+
+# Ignore temp folder
+temp/
