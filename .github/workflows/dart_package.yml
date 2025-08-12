@@ -1,0 +1,26 @@
+name: Dart Package CI
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - '.github/workflows/dart_package.yml'
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - '.github/workflows/dart_package.yml'
+
+jobs:
+  build:
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/dart_package.yml@v1
+    with:
+      analyze_directories: 'lib test'
+      concurrency: 1
+      coverage_excludes: '**/lib/src/crdt_columns.dart'
+      format_directories: 'lib test'
+      min_coverage: 95
+      no_example: true
