@@ -29,7 +29,7 @@ dart pub add drift drift_crdt
 
 ## Quick start
 
-### 1) Define your table(s)
+### 1) Add the `CrdtColumns` mixin to your tables
 
 Add the `CrdtColumns` mixin to any table that should be replicated. Include your app-specific columns as usual.
 
@@ -47,21 +47,7 @@ CRDT columns added by the mixin:
 - `nodeId` (text): node id extracted from the HLC
 - `modified` (text): last write HLC
 
-### 2) Create your Drift database as usual
-
-```dart
-import 'package:drift/drift.dart';
-part 'app_database.g.dart';
-
-@DriftDatabase(tables: [Todos])
-class AppDatabase extends _$AppDatabase {
-  AppDatabase(super.executor);
-  @override
-  int get schemaVersion => 1;
-}
-```
-
-### 3) Wrap it with `DriftCrdt` and initialize
+### 2) Wrap it with `DriftCrdt` and initialize
 
 ```dart
 import 'package:drift_crdt/drift_crdt.dart';
