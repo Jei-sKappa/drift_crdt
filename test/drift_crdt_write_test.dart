@@ -115,6 +115,24 @@ void main() {
       await expectUpdateIsCorrect(userA.db, userA.nodeId, row);
     });
 
+    test('update correctly updates existing row using more than 1 where clause',
+        () async {
+      await userA.write((w) => w.insert(userA.db.todos, todo1));
+      final row = await expectInsertIsCorrect(userA.db, userA.nodeId);
+
+      final rowsWritten = await userA.write(
+        (w) => w.update(userA.db.todos, todo1Updated,
+            where: (t) => [
+                  t.id.equals(todo1.id.value),
+                  t.title.equals(todo1.title.value),
+                  t.done.equals(todo1.done.value),
+                ]),
+      );
+      expect(rowsWritten, 1);
+
+      await expectUpdateIsCorrect(userA.db, userA.nodeId, row);
+    });
+
     test(
       'update correctly updates existing row inserted by other node',
       () async {
@@ -156,6 +174,24 @@ void main() {
 
       final rowsWritten = await userA.write(
         (w) => w.delete(userA.db.todos, where: whereTodo1Id),
+      );
+      expect(rowsWritten, 1);
+
+      await expectDeleteIsCorrect(userA.db);
+    });
+
+    test('delete marks row as deleted using more than 1 where clause',
+        () async {
+      await userA.write((w) => w.insert(userA.db.todos, todo1));
+      await expectInsertIsCorrect(userA.db, userA.nodeId);
+
+      final rowsWritten = await userA.write(
+        (w) => w.delete(userA.db.todos,
+            where: (t) => [
+                  t.id.equals(todo1.id.value),
+                  t.title.equals(todo1.title.value),
+                  t.done.equals(todo1.done.value),
+                ]),
       );
       expect(rowsWritten, 1);
 

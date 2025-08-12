@@ -275,5 +275,25 @@ void main() {
 
       await subscription.cancel();
     });
+
+    test('_selectBuilder works correctly with more than 1 where clause',
+        () async {
+      await crdt.write((w) => w.insert(crdt.db.todos, todo1));
+
+      final rows = await crdt.select(crdt.db.todos,
+          where: (t) => [
+                t.id.equals(todo1.id.value),
+                t.title.equals(todo1.title.value),
+                t.done.equals(todo1.done.value),
+              ]);
+      expect(rows.length, 1);
+
+      final todo1Row = rows.first;
+      expect(todo1Row.title, todo1.title.value);
+      expect(todo1Row.done, todo1.done.value);
+      expect(todo1Row.hlc, todo1Row.hlc);
+      expect(Hlc.parse(todo1Row.hlc).nodeId, todo1Row.nodeId);
+      expect(todo1Row.isDeleted, false);
+    });
   });
 }
