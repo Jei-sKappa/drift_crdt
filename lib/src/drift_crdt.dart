@@ -205,12 +205,16 @@ class DriftCrdt<T extends GeneratedDatabase> with Crdt, DriftCrdtReader {
               .map((col) => '$col = excluded.$col')
               .join(', ');
 
+          //TODO: We should use customInsert or customUpdate here.
+          // At the moment it's not clear which one to use given that this
+          // stament is an upsert.
           await db.customStatement('''
             INSERT INTO ${table.actualTableName} ($columnList)
             VALUES ($placeholders)
             ON CONFLICT DO UPDATE SET $updateClauses
             WHERE excluded.hlc > ${table.actualTableName}.hlc
           ''', values);
+          db.markTablesUpdated([table]);
         }
       }
     });
